@@ -33,7 +33,7 @@ A flexible system for managing music metadata from multiple sources.
    curl -sSL https://install.python-poetry.org | python3 -
    
    # Clone and install
-   git clone <repository-url>
+   git clone https://github.com/DrBuhu/Music-dlp.git
    cd Music-dlp
    poetry install
    ```
