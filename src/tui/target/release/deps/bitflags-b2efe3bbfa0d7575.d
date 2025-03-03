@@ -1,0 +1,13 @@
+/home/x/Music-dlp/src/tui/target/release/deps/libbitflags-b2efe3bbfa0d7575.rmeta: /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/lib.rs /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/iter.rs /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/parser.rs /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/traits.rs /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/public.rs /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/internal.rs /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/external.rs
+
+/home/x/Music-dlp/src/tui/target/release/deps/libbitflags-b2efe3bbfa0d7575.rlib: /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/lib.rs /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/iter.rs /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/parser.rs /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/traits.rs /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/public.rs /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/internal.rs /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/external.rs
+
+/home/x/Music-dlp/src/tui/target/release/deps/bitflags-b2efe3bbfa0d7575.d: /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/lib.rs /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/iter.rs /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/parser.rs /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/traits.rs /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/public.rs /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/internal.rs /home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/external.rs
+
+/home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/lib.rs:
+/home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/iter.rs:
+/home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/parser.rs:
+/home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/traits.rs:
+/home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/public.rs:
+/home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/internal.rs:
+/home/x/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.9.0/src/external.rs:

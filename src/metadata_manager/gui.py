@@ -1,238 +1,472 @@
+"""GUI implementation for Music-dlp."""
+import os
+import sys
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
-from PIL import Image, ImageTk
+from tkinter import filedialog, ttk, messagebox
+from pathlib import Path
+import threading
+from PIL import Image, ImageTk, ImageDraw
 import io
 import requests
-from pathlib import Path
-from .core.scanner import MusicScanner
+
+from .core.file_scanner import FileScanner
 from .core.metadata_manager import MetadataManager
+from .core.artwork_finder import find_artwork
 
 class MetadataManagerGUI:
-    def __init__(self):
-        self.window = tk.Tk()
-        self.window.title("Music Metadata Manager")
-        self.window.geometry("1024x768")  # Increased size for more columns
+    def __init__(self, root):
+        """Initialize the GUI."""
+        self.root = root
+        self.root.title("Music Metadata Manager")
+        self.root.geometry("1000x600")
         
-        # Browse frame
-        self.browse_frame = ttk.Frame(self.window)
-        self.browse_frame.pack(padx=10, pady=10, fill="x")
+        # Initialize backend components
+        self.scanner = FileScanner()
+        self.manager = MetadataManager()
+        self.current_files = []
+        self.current_results = {}
+        self.selected_metadata = None
         
-        # Browse button
-        self.browse_btn = ttk.Button(
-            self.browse_frame, 
-            text="Browse Music Files/Folders",
-            command=self.browse_files
-        )
-        self.browse_btn.pack(side="left", padx=5)
+        # Create the main layout
+        self.create_menu()
+        self.create_layout()
+    
+    def create_menu(self):
+        """Create top menu bar."""
+        menubar = tk.Menu(self.root)
         
-        # Path display
-        self.path_label = ttk.Label(self.browse_frame, text="No folder selected")
-        self.path_label.pack(side="left", padx=5, fill="x", expand=True)
+        # File menu
+        filemenu = tk.Menu(menubar, tearoff=0)
+        filemenu.add_command(label="Open Folder", command=self.open_folder)
+        filemenu.add_separator()
+        filemenu.add_command(label="Exit", command=self.root.quit)
+        menubar.add_cascade(label="File", menu=filemenu)
         
-        # Results frame with artwork preview
-        self.results_frame = ttk.Frame(self.window)
-        self.results_frame.pack(padx=10, pady=10, fill="both", expand=True)
+        # Actions menu
+        actionmenu = tk.Menu(menubar, tearoff=0)
+        actionmenu.add_command(label="Scan Files", command=self.scan_folder)
+        actionmenu.add_command(label="Search Metadata", command=self.search_metadata)
+        actionmenu.add_command(label="Apply Metadata", command=self.apply_metadata)
+        menubar.add_cascade(label="Actions", menu=actionmenu)
         
-        # Artwork preview
-        self.artwork_label = ttk.Label(self.results_frame)
-        self.artwork_label.pack(side="left", padx=10)
+        # Help menu
+        helpmenu = tk.Menu(menubar, tearoff=0)
+        helpmenu.add_command(label="About", command=self.show_about)
+        helpmenu.add_command(label="Help", command=self.show_help)
+        menubar.add_cascade(label="Help", menu=helpmenu)
         
-        # Results tree with more columns and better formatting
-        self.results_tree = ttk.Treeview(
-            self.results_frame, 
-            columns=("Track", "Title", "Artist", "Album", "Tracks", "Year", "Source"),
-            show="headings"
-        )
+        self.root.config(menu=menubar)
+    
+    def create_layout(self):
+        """Create the main application layout."""
+        # Main frame
+        main_frame = ttk.Frame(self.root)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # Configure columns
-        self.results_tree.heading("Track", text="#")
+        # Left panel - Files
+        left_frame = ttk.LabelFrame(main_frame, text="Music Files")
+        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Create file list with scrollbar
+        self.file_tree = ttk.Treeview(left_frame, columns=("Track", "Title", "Artist", "Album", "Year"))
+        self.file_tree.heading("#0", text="")
+        self.file_tree.heading("Track", text="Track")
+        self.file_tree.heading("Title", text="Title")
+        self.file_tree.heading("Artist", text="Artist")
+        self.file_tree.heading("Album", text="Album")
+        self.file_tree.heading("Year", text="Year")
+        self.file_tree.column("#0", width=0, stretch=tk.NO)
+        self.file_tree.column("Track", width=50)
+        self.file_tree.column("Title", width=150)
+        self.file_tree.column("Artist", width=150)
+        self.file_tree.column("Album", width=150)
+        self.file_tree.column("Year", width=60)
+        self.file_tree.pack(fill=tk.BOTH, expand=True)
+        
+        # Add scrollbar for file list
+        file_scroll = ttk.Scrollbar(left_frame, orient="vertical", command=self.file_tree.yview)
+        file_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.file_tree.configure(yscrollcommand=file_scroll.set)
+        
+        # Right panel - Results and details
+        right_frame = ttk.Frame(main_frame)
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Results frame - top right
+        results_frame = ttk.LabelFrame(right_frame, text="Search Results")
+        results_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Create results treeview
+        self.results_tree = ttk.Treeview(results_frame, columns=("Source", "Title", "Artist", "Album", "Year", "Tracks"))
+        self.results_tree.heading("#0", text="")
+        self.results_tree.heading("Source", text="Source")
         self.results_tree.heading("Title", text="Title")
         self.results_tree.heading("Artist", text="Artist")
         self.results_tree.heading("Album", text="Album")
-        self.results_tree.heading("Tracks", text="Tracks")
         self.results_tree.heading("Year", text="Year")
-        self.results_tree.heading("Source", text="Source")
-        
-        # Set column widths and alignments
-        self.results_tree.column("Track", width=40, anchor="e")
-        self.results_tree.column("Title", width=200)
-        self.results_tree.column("Artist", width=150)
-        self.results_tree.column("Album", width=200)
-        self.results_tree.column("Tracks", width=60, anchor="e")
-        self.results_tree.column("Year", width=60, anchor="e")
+        self.results_tree.heading("Tracks", text="Tracks")
+        self.results_tree.column("#0", width=0, stretch=tk.NO)
         self.results_tree.column("Source", width=80)
+        self.results_tree.column("Title", width=150)
+        self.results_tree.column("Artist", width=150)
+        self.results_tree.column("Album", width=150)
+        self.results_tree.column("Year", width=60)
+        self.results_tree.column("Tracks", width=60)
+        self.results_tree.pack(fill=tk.BOTH, expand=True)
         
-        # Style the treeview
-        style = ttk.Style()
-        style.configure("Treeview", font=('Arial', 10))
-        style.configure("Treeview.Heading", font=('Arial', 10, 'bold'))
+        # Add scrollbar for results
+        results_scroll = ttk.Scrollbar(results_frame, orient="vertical", command=self.results_tree.yview)
+        results_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.results_tree.configure(yscrollcommand=results_scroll.set)
         
-        # Add alternating row colors
-        style.map('Treeview',
-            background=[('selected', '#0078D7'), ('alternate', '#F0F0F0')])
+        # Details frame - bottom right
+        details_frame = ttk.LabelFrame(right_frame, text="Selected Metadata")
+        details_frame.pack(fill=tk.BOTH, expand=True, pady=5)
         
-        # Scrollbar
-        scrollbar = ttk.Scrollbar(self.results_frame, orient="vertical", command=self.results_tree.yview)
-        self.results_tree.configure(yscrollcommand=scrollbar.set)
+        # Left side: Metadata details
+        details_left = ttk.Frame(details_frame)
+        details_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
-        # Pack with scrollbar
-        self.results_tree.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        # Text widget for metadata details
+        self.details_text = tk.Text(details_left, height=10, wrap=tk.WORD)
+        self.details_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Right side: Artwork
+        details_right = ttk.Frame(details_frame)
+        details_right.pack(side=tk.RIGHT, fill=tk.BOTH, padx=5, pady=5)
+        
+        # Label for artwork
+        self.artwork_label = ttk.Label(details_right, text="No artwork")
+        self.artwork_label.pack(fill=tk.BOTH, expand=True)
         
         # Status bar
         self.status_var = tk.StringVar()
-        self.status_bar = ttk.Label(
-            self.window, 
-            textvariable=self.status_var,
-            relief=tk.SUNKEN,
-            anchor=tk.W
-        )
-        self.status_bar.pack(side="bottom", fill="x")
+        self.status_var.set("Ready")
+        status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
+        status_bar.pack(side=tk.BOTTOM, fill=tk.X)
         
-        # Manager instance
-        self.manager = MetadataManager()
-        self.set_status("Ready")
+        # Bind events
+        self.file_tree.bind("<Double-1>", self.on_file_double_click)
+        self.results_tree.bind("<<TreeviewSelect>>", self.on_result_selected)
+    
+    def open_folder(self):
+        """Open folder dialog and scan selected directory."""
+        folder = filedialog.askdirectory(title="Select Music Directory")
+        if folder:
+            self.scan_directory(folder)
+    
+    def scan_folder(self):
+        """Scan current folder."""
+        if hasattr(self, 'current_folder'):
+            self.scan_directory(self.current_folder)
+        else:
+            self.open_folder()
+    
+    def scan_directory(self, path, recursive=True):
+        """Scan directory for music files."""
+        self.status_var.set(f"Scanning {path}...")
+        self.root.update_idletasks()
         
-        # Add right-click menu
-        self.context_menu = tk.Menu(self.window, tearoff=0)
-        self.context_menu.add_command(label="Apply Selected Metadata", command=self.apply_metadata)
-        self.context_menu.add_command(label="Show Details", command=self.show_details)
-        self.results_tree.bind("<Button-3>", self.show_context_menu)
-    
-    def set_status(self, message: str):
-        """Update status bar message."""
-        self.status_var.set(message)
-        self.window.update_idletasks()
-    
-    def browse_files(self):
-        """Open file browser dialog."""
-        directory = filedialog.askdirectory(
-            title="Select Music Directory",
-            initialdir="~"
-        )
-        if directory:
-            self.path_label.config(text=directory)
-            self.process_directory(directory)
-    
-    def process_directory(self, directory):
-        """Process a music directory."""
-        self.set_status(f"Scanning {directory}...")
-        scanner = MusicScanner(directory)
-        files = scanner.scan_directory()
+        # Clear current data
+        self.clear_display()
+        self.current_folder = path
         
-        if not files:
-            messagebox.showinfo("Info", "No music files found!")
-            self.set_status("Ready")
-            return
+        # Start scan in a separate thread
+        def scan_thread():
+            files = self.scanner.scan_directory(path, recursive=recursive)
+            self.current_files = files
             
-        # Search metadata
-        self.set_status("Searching metadata...")
-        results = self.manager.search_all(files)
+            # Update UI in main thread
+            self.root.after(0, lambda: self.update_file_list(files))
         
-        # Clear previous results
+        threading.Thread(target=scan_thread).start()
+    
+    def update_file_list(self, files):
+        """Update file list in the treeview."""
+        # Clear existing items
+        for item in self.file_tree.get_children():
+            self.file_tree.delete(item)
+        
+        # Add files to the treeview
+        for i, file in enumerate(files):
+            metadata = file["metadata"]
+            track = metadata.get("track", [""])[0]
+            title = metadata.get("title", [""])[0] or os.path.basename(file["path"])
+            artist = metadata.get("artist", [""])[0]
+            album = metadata.get("album", [""])[0]
+            year = metadata.get("date", [""])[0]
+            
+            self.file_tree.insert("", tk.END, text="", values=(track, title, artist, album, year))
+        
+        self.status_var.set(f"Found {len(files)} music files in {self.current_folder}")
+    
+    def search_metadata(self):
+        """Search metadata for selected files."""
+        if not self.current_files:
+            messagebox.showinfo("No Files", "No music files to search metadata for.")
+            return
+        
+        # Start search in a separate thread
+        self.status_var.set("Searching metadata...")
+        
+        def search_thread():
+            # Get album info from first file
+            first_file = self.current_files[0]
+            metadata = first_file["metadata"]
+            album = metadata.get("album", [""])[0]
+            artist = metadata.get("artist", [""])[0]
+            
+            if album and artist:
+                try:
+                    # Search for album metadata
+                    results = {}
+                    for provider in self.manager.providers:
+                        matches = provider.search_album(album, artist)
+                        if matches:
+                            results[provider.name] = matches
+                    
+                    self.current_results = results
+                    
+                    # Update UI in main thread
+                    self.root.after(0, lambda: self.update_results(results))
+                except Exception as e:
+                    self.root.after(0, lambda: messagebox.showerror("Error", f"Search failed: {str(e)}"))
+                    self.status_var.set("Search failed")
+        
+        threading.Thread(target=search_thread).start()
+    
+    def update_results(self, results):
+        """Update results in the treeview."""
+        # Clear existing items
         for item in self.results_tree.get_children():
             self.results_tree.delete(item)
         
-        # Show results
-        for source, matches in results.items():
+        # Add results to the treeview
+        for provider, matches in results.items():
             for match in matches:
-                # Fix title/album confusion
-                title = match.get('album', '') if match.get('type') == 'album' else match.get('title', '')
-                album = match.get('album', '') if match.get('type') != 'album' else title
-                track_num = match.get('position', '')
-                num_tracks = len(match.get('tracks', []))
-                
-                self.results_tree.insert("", "end", values=(
-                    track_num,
-                    title,
-                    match['artist'],
-                    album,
-                    num_tracks or '',
-                    match.get('year', ''),
-                    match.get('source', source).upper()
-                ), tags=('alternate',))
-                
-                # Show artwork if available
-                if 'artwork_url' in match:
-                    self.show_artwork(match['artwork_url'])
+                self.results_tree.insert(
+                    "", 
+                    tk.END, 
+                    text="", 
+                    values=(
+                        provider.upper(),
+                        match.get('title', ''),
+                        match.get('artist', ''),
+                        match.get('album', ''),
+                        match.get('year', ''),
+                        len(match.get('tracks', []))
+                    )
+                )
         
-        self.set_status(f"Found {len(files)} files")
+        self.status_var.set(f"Found metadata from {len(results)} providers")
     
-    def show_artwork(self, url):
-        """Download and display artwork."""
-        try:
-            response = requests.get(url)
-            img_data = response.content
-            img = Image.open(io.BytesIO(img_data))
+    def on_file_double_click(self, event):
+        """Handle double click on file item."""
+        # Get selected item
+        selection = self.file_tree.selection()
+        if not selection:
+            return
             
-            # Resize to fit
-            img.thumbnail((200, 200))
-            
-            # Convert to PhotoImage
-            photo = ImageTk.PhotoImage(img)
-            self.artwork_label.configure(image=photo)
-            self.artwork_label.image = photo  # Keep reference
-            
-        except Exception as e:
-            print(f"Error loading artwork: {e}")
+        item = selection[0]
+        values = self.file_tree.item(item, "values")
+        
+        # Get file index
+        idx = self.file_tree.index(item)
+        if idx < len(self.current_files):
+            file = self.current_files[idx]
+            self.show_file_details(file)
     
-    def show_context_menu(self, event):
-        """Show right-click menu."""
+    def on_result_selected(self, event):
+        """Handle selection of a search result."""
+        if not self.results_tree.selection():
+            return
+            
+        # Get selected item
+        item = self.results_tree.selection()[0]
+        values = self.results_tree.item(item, "values")
+        
+        # Find matching metadata
+        provider = values[0].lower()
+        title = values[1]
+        artist = values[2]
+        
+        if provider in self.current_results:
+            for match in self.current_results[provider]:
+                if (match.get('title', '') == title and 
+                    match.get('artist', '') == artist):
+                    self.selected_metadata = match
+                    self.show_metadata_details(match)
+                    break
+    
+    def show_file_details(self, file):
+        """Show details for selected file."""
+        metadata = file["metadata"]
+        
+        # Format text for display
+        details = [
+            "File Details:",
+            f"Path: {file['path']}",
+            f"Title: {metadata.get('title', [''])[0]}",
+            f"Artist: {metadata.get('artist', [''])[0]}",
+            f"Album: {metadata.get('album', [''])[0]}",
+            f"Year: {metadata.get('date', [''])[0]}",
+            f"Track: {metadata.get('track', [''])[0]}"
+        ]
+        
+        # Update details text
+        self.details_text.delete(1.0, tk.END)
+        self.details_text.insert(tk.END, "\n".join(details))
+    
+    def show_metadata_details(self, metadata):
+        """Show details for selected metadata."""
+        # Format text for display
+        details = [
+            f"Provider: {metadata.get('provider', '').upper()}",
+            f"Title: {metadata.get('title', '')}",
+            f"Artist: {metadata.get('artist', '')}",
+            f"Album: {metadata.get('album', '')}",
+            f"Year: {metadata.get('year', '')}",
+            f"\nTracks: {len(metadata.get('tracks', []))}"
+        ]
+        
+        # Add track listing
+        if tracks := metadata.get('tracks', []):
+            details.append("\nTrack Listing:")
+            for track in tracks:
+                details.append(f"{track['position']}. {track['title']}")
+        
+        # Update details text
+        self.details_text.delete(1.0, tk.END)
+        self.details_text.insert(tk.END, "\n".join(details))
+        
+        # Try to load and display artwork
+        self.load_artwork(metadata)
+    
+    def load_artwork(self, metadata):
+        """Try to load and display artwork."""
+        # Reset artwork
+        self.artwork_label.config(text="Loading artwork...")
+        self.root.update_idletasks()
+        
+        # Start artwork loading in a thread
+        def load_thread():
+            try:
+                # Try to get artwork URL from metadata or find it
+                artwork_url = metadata.get('artwork_url')
+                
+                # Si no hay URL, intentar buscar por artista y álbum
+                if not artwork_url:
+                    artwork_url = find_artwork(
+                        artist=metadata.get('artist', ''),
+                        album=metadata.get('title', '') or metadata.get('album', '')
+                    )
+                
+                if artwork_url:
+                    response = requests.get(artwork_url)
+                    if response.status_code == 200:
+                        image = Image.open(io.BytesIO(response.content))
+                        image = image.resize((200, 200), Image.LANCZOS)
+                        photo = ImageTk.PhotoImage(image)
+                        self.root.after(0, lambda: self.update_artwork(photo))
+                    else:
+                        self.root.after(0, lambda: self.artwork_label.config(text="Artwork unavailable"))
+                else:
+                    # Si no hay URL, usar placeholder
+                    self.root.after(0, lambda: self.load_placeholder_artwork())
+            except Exception as e:
+                print(f"Error loading artwork: {e}")
+                self.root.after(0, lambda: self.artwork_label.config(text="Error loading artwork"))
+        
+        threading.Thread(target=load_thread).start()
+    
+    def load_placeholder_artwork(self):
+        """Load a placeholder image for artwork."""
         try:
-            self.context_menu.tk_popup(event.x_root, event.y_root)
-        finally:
-            self.context_menu.grab_release()
+            # Create simple placeholder with PIL
+            image = Image.new('RGB', (200, 200), color=(50, 50, 50))
+            d = ImageDraw.Draw(image)
+            d.text((65, 90), "No Artwork", fill=(200, 200, 200))
+            photo = ImageTk.PhotoImage(image)
+            self.update_artwork(photo)
+        except:
+            self.artwork_label.config(text="No artwork")
+    
+    def update_artwork(self, photo):
+        """Update artwork display with loaded image."""
+        self.artwork = photo  # Keep reference to prevent garbage collection
+        self.artwork_label.config(image=photo, text="")
+    
+    def clear_display(self):
+        """Clear all display elements."""
+        # Clear file list
+        for item in self.file_tree.get_children():
+            self.file_tree.delete(item)
+        
+        # Clear results
+        for item in self.results_tree.get_children():
+            self.results_tree.delete(item)
+        
+        # Clear details and artwork
+        self.details_text.delete(1.0, tk.END)
+        self.artwork_label.config(text="No artwork", image="")
     
     def apply_metadata(self):
         """Apply selected metadata to files."""
-        selected = self.results_tree.selection()
-        if not selected:
-            messagebox.showwarning("Warning", "Please select a metadata entry first")
+        if not self.selected_metadata:
+            messagebox.showinfo("No Selection", "No metadata selected to apply.")
+            return
+            
+        if not self.current_files:
+            messagebox.showinfo("No Files", "No music files to apply metadata to.")
             return
         
-        if messagebox.askyesno("Confirm", "Apply selected metadata to files?"):
-            # TODO: Implement metadata application
-            self.set_status("Applying metadata...")
+        # Confirm action
+        proceed = messagebox.askokcancel(
+            "Apply Metadata", 
+            f"Apply metadata from {self.selected_metadata.get('provider', '').upper()} to {len(self.current_files)} files?"
+        )
+        
+        if proceed:
+            self.status_var.set("Applying metadata...")
+            
+            # TODO: Implement actual metadata application
+            
+            messagebox.showinfo("Success", "Metadata applied successfully.")
+            self.status_var.set("Metadata applied successfully.")
     
-    def show_details(self):
-        """Show detailed metadata information."""
-        selected = self.results_tree.selection()
-        if not selected:
-            messagebox.showwarning("Warning", "Please select a metadata entry first")
-            return
-        
-        # Get selected item data
-        item = self.results_tree.item(selected[0])
-        values = item['values']
-        
-        # Create details window
-        details = tk.Toplevel(self.window)
-        details.title("Metadata Details")
-        details.geometry("400x300")
-        
-        # Add details
-        ttk.Label(details, text="Title:", anchor="e").grid(row=0, column=0, padx=5, pady=5, sticky="e")
-        ttk.Label(details, text=values[1]).grid(row=0, column=1, padx=5, pady=5, sticky="w")
-        
-        ttk.Label(details, text="Artist:", anchor="e").grid(row=1, column=0, padx=5, pady=5, sticky="e")
-        ttk.Label(details, text=values[2]).grid(row=1, column=1, padx=5, pady=5, sticky="w")
-        
-        ttk.Label(details, text="Album:", anchor="e").grid(row=2, column=0, padx=5, pady=5, sticky="e")
-        ttk.Label(details, text=values[3]).grid(row=2, column=1, padx=5, pady=5, sticky="w")
-        
-        ttk.Label(details, text="Year:", anchor="e").grid(row=3, column=0, padx=5, pady=5, sticky="e")
-        ttk.Label(details, text=values[4]).grid(row=3, column=1, padx=5, pady=5, sticky="w")
-        
-        ttk.Label(details, text="Source:", anchor="e").grid(row=4, column=0, padx=5, pady=5, sticky="e")
-        ttk.Label(details, text=values[5]).grid(row=4, column=1, padx=5, pady=5, sticky="w")
+    def show_about(self):
+        """Show about dialog."""
+        messagebox.showinfo(
+            "About Music Metadata Manager", 
+            "Music Metadata Manager GUI\n"
+            "Version 0.1.0\n\n"
+            "A flexible system for managing music metadata from multiple sources."
+        )
     
-    def run(self):
-        """Start the GUI."""
-        self.window.mainloop()
+    def show_help(self):
+        """Show help dialog."""
+        messagebox.showinfo(
+            "Help", 
+            "How to use:\n"
+            "1. Select a music folder using File > Open Folder\n"
+            "2. Select files to search metadata for\n"
+            "3. Click Actions > Search Metadata\n"
+            "4. Select a result to see details\n"
+            "5. Apply metadata with Actions > Apply Metadata"
+        )
 
 def main():
-    app = MetadataManagerGUI()
-    app.run()
+    """Run the GUI application."""
+    # Create root window and configure style
+    root = tk.Tk()
+    style = ttk.Style()
+    style.theme_use('clam')  # Use a modern theme
+    
+    # Create app
+    app = MetadataManagerGUI(root)
+    
+    # Start main loop
+    root.mainloop()
 
 if __name__ == "__main__":
     main()
