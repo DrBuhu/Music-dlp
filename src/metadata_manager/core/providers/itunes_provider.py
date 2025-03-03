@@ -1,8 +1,9 @@
 from typing import Dict, List
 import requests
 from rich import print as rprint
-from ...core.metadata_manager import MetadataProvider
-from ...core.utils import string_similarity
+
+from .provider_base import MetadataProvider
+from ...core.utils import string_similarity  # Añadir import correcto
 
 class ITunesProvider(MetadataProvider):
     """iTunes/Apple Music metadata provider."""

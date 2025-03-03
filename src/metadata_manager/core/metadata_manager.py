@@ -1,180 +1,41 @@
+"""Core metadata manager."""
 from typing import Dict, List, Optional
-from abc import ABC, abstractmethod
-import musicbrainzngs as mb
 from rich import print as rprint
-from rich.prompt import Prompt, Confirm
+from rich.prompt import Prompt, Confirm  # Añadir import de Prompt
 
-try:
-    from ..rust.metadata_core import MetadataMatcher
-    HAS_RUST = True
-except ImportError:
-    HAS_RUST = False
-    print("Warning: Rust optimizations not available")
-
-class MetadataProvider(ABC):
-    """Base class for metadata providers."""
-    
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Provider name."""
-        pass
-    
-    @abstractmethod
-    def search_track(self, title: str, artist: str = None) -> List[Dict]:
-        """Search for a track."""
-        pass
-    
-    @abstractmethod
-    def search_album(self, album: str, artist: str = None) -> List[Dict]:
-        """Search for an album."""
-        pass
-    
-    def format_result(self, data: Dict, type: str = "track") -> Dict:
-        """Format provider-specific data to common format."""
-        return {
-            'title': data.get('title', ''),
-            'artist': data.get('artist', ''),
-            'album': data.get('album', ''),
-            'year': data.get('year', ''),
-            'tracks': data.get('tracks', []),
-            'source': self.name,
-            'raw_data': data
-        }
-
-class MusicBrainzProvider(MetadataProvider):
-    """MusicBrainz metadata provider."""
-    
-    def __init__(self, app_name: str = "MetadataManager", version: str = "0.1.0"):
-        mb.set_useragent(app_name, version)
-    
-    @property
-    def name(self) -> str:
-        return "musicbrainz"
-    
-    def search_track(self, title: str, artist: str = None) -> List[Dict]:
-        """Search for a track in MusicBrainz."""
-        query = f'recording:"{title}"'
-        if artist:
-            query += f' AND artist:"{artist}"'
-            
-        try:
-            result = mb.search_recordings(query=query, limit=5)
-            return self._parse_track_results(result['recording-list'])
-        except Exception as e:
-            print(f"Error searching MusicBrainz: {str(e)}")
-            return []
-    
-    def search_album(self, album: str, artist: str = None) -> List[Dict]:
-        """Search for an album in MusicBrainz."""
-        query = f'release:"{album}"'
-        if artist:
-            query += f' AND artist:"{artist}"'
-            
-        try:
-            result = mb.search_releases(query=query, limit=5)
-            return self._parse_album_results(result['release-list'])
-        except Exception as e:
-            print(f"Error searching MusicBrainz: {str(e)}")
-            return []
-    
-    def _parse_track_results(self, tracks: List[Dict]) -> List[Dict]:
-        """Parse track search results."""
-        results = []
-        for track in tracks:
-            results.append(self.format_result({
-                'title': track.get('title', ''),
-                'artist': track['artist-credit'][0].get('name', '') if 'artist-credit' in track else '',
-                'album': track['release-list'][0].get('title', '') if 'release-list' in track else '',
-                'year': track['release-list'][0].get('date', '')[:4] if 'release-list' in track else '',
-                'id': track.get('id', '')
-            }))
-        return results
-    
-    def _parse_album_results(self, albums: List[Dict]) -> List[Dict]:
-        """Parse album search results."""
-        results = []
-        for album in albums:
-            results.append(self.format_result({
-                'title': album.get('title', ''),
-                'artist': album['artist-credit'][0].get('name', '') if 'artist-credit' in album else '',
-                'year': album.get('date', '')[:4] if 'date' in album else '',
-                'id': album.get('id', ''),
-                'tracks': self._get_album_tracks(album.get('id', ''))
-            }, "album"))
-        return results
-    
-    def _get_album_tracks(self, album_id: str) -> List[Dict]:
-        """Get tracks for an album."""
-        try:
-            release = mb.get_release_by_id(album_id, includes=['recordings'])
-            tracks = []
-            for medium in release['release']['medium-list']:
-                for track in medium['track-list']:
-                    tracks.append({
-                        'title': track['recording']['title'],
-                        'position': track['position'],
-                        'id': track['recording']['id']
-                    })
-            return tracks
-        except:
-            return []
+# Importar los providers directamente
+from .providers.provider_base import MetadataProvider
+from .providers.musicbrainz_provider import MusicBrainzProvider
+from .providers.youtube_provider import YouTubeMusicProvider
+from .providers.spotify_provider import SpotifyProvider
+from .providers.itunes_provider import ITunesProvider
+from .providers.deezer_provider import DeezerProvider
 
 class MetadataManager:
-    """Manages metadata search and updates across multiple providers."""
-    
-    def __init__(self):
+    def __init__(self, enabled_providers: Optional[List[str]] = None):
+        """Initialize with all providers."""
         self.providers = []
         rprint("[cyan]Initializing metadata providers...[/cyan]")
         
-        # 1. MusicBrainz (primary source)
-        self.providers.append(MusicBrainzProvider())
-        rprint("[green]MusicBrainz provider loaded[/green]")
+        # Initialize all providers in order
+        provider_map = {
+            'musicbrainz': MusicBrainzProvider,
+            'youtube': YouTubeMusicProvider,
+            'spotify': SpotifyProvider,
+            'itunes': ITunesProvider,
+            'deezer': DeezerProvider
+        }
         
-        # 2. YouTube Music (good metadata + artwork)
-        try:
-            from .providers.youtube_provider import YouTubeMusicProvider
-            youtube = YouTubeMusicProvider()
-            self.providers.append(youtube)
-            rprint("[green]YouTube Music provider loaded successfully[/green]")
-        except Exception as e:
-            rprint(f"[yellow]Warning: YouTube Music support not available - {str(e)}[/yellow]")
+        for name, provider_class in provider_map.items():
+            if not enabled_providers or name in enabled_providers:
+                try:
+                    provider = provider_class()
+                    self.providers.append(provider)
+                    rprint(f"[green]{name.title()} provider loaded[/green]")
+                except Exception as e:
+                    rprint(f"[yellow]Warning: {name.title()} support not available - {str(e)}[/yellow]")
         
-        # 3. iTunes (reliable metadata)
-        try:
-            from .providers.itunes_provider import ITunesProvider
-            itunes = ITunesProvider()
-            self.providers.append(itunes)
-            rprint("[green]iTunes provider loaded successfully[/green]")
-        except Exception as e:
-            rprint(f"[yellow]Warning: iTunes support not available - {str(e)}[/yellow]")
-        
-        # 4. Deezer (high quality artwork)
-        try:
-            from .providers.deezer_provider import DeezerProvider
-            deezer = DeezerProvider()
-            self.providers.append(deezer)
-            rprint("[green]Deezer provider loaded successfully[/green]")
-        except Exception as e:
-            rprint(f"[yellow]Warning: Deezer support not available - {str(e)}[/yellow]")
-
-        # 5. Spotify (backup source)
-        try:
-            from .providers.spotify_provider import SpotifyProvider
-            spotify = SpotifyProvider()
-            self.providers.append(spotify)
-            rprint("[green]Spotify provider loaded successfully[/green]")
-        except Exception as e:
-            rprint(f"[yellow]Warning: Spotify support not available - {str(e)}[/yellow]")
-
         rprint(f"[cyan]Active providers: {[p.name for p in self.providers]}[/cyan]")
-        
-        # Initialize matcher
-        try:
-            from ..rust.metadata_core import MetadataMatcher
-            self.matcher = MetadataMatcher()
-        except ImportError:
-            self.matcher = None
     
     def download_and_tag(self, url: str, output_dir: str) -> Dict:
         """Download music and get metadata."""
@@ -428,21 +289,12 @@ class MetadataManager:
     
     def _sort_matches(self, matches: List[Dict], reference: Dict) -> List[Dict]:
         """Sort matches by similarity score."""
-        if not self.matcher:
-            # Simple Python fallback
-            return sorted(matches, 
-                key=lambda x: (
-                    x.get('year', '') == reference.get('year', ''),
-                    len(x.get('tracks', [])) > 0,
-                    x.get('title', '').lower() == reference.get('title', '').lower()
-                ), 
-                reverse=True
-            )
-        
-        # Use Rust if available    
-        scored_matches = []
-        for match in matches:
-            score = self.matcher.score_match(reference, match)
-            scored_matches.append((score, match))
-        
-        return [m for s, m in sorted(scored_matches, key=lambda x: x[0], reverse=True)]
+        # Simple Python fallback without Rust
+        return sorted(matches, 
+            key=lambda x: (
+                x.get('year', '') == reference.get('year', ''),
+                len(x.get('tracks', [])) > 0,
+                x.get('title', '').lower() == reference.get('title', '').lower()
+            ), 
+            reverse=True
+        )

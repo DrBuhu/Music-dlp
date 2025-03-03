@@ -1,8 +1,9 @@
 from typing import Dict, List
 import requests
 from rich import print as rprint
-from ...core.metadata_manager import MetadataProvider
-from ...core.utils import string_similarity
+
+from .provider_base import MetadataProvider
+from ...core.utils import string_similarity  # Añadir import correcto
 
 class DeezerProvider(MetadataProvider):
     """Deezer metadata provider using public API."""
@@ -39,8 +40,8 @@ class DeezerProvider(MetadataProvider):
                         'title': track['title'],
                         'artist': track['artist']['name'],
                         'album': track['album']['title'],
-                        'year': track.get('year', ''),
-                        'tracks': [],
+                        'year': str(track.get('album', {}).get('release_date', ''))[:4],  # Extraer año
+                        'tracks': self._get_album_tracks(track['album']['id']) if track.get('album') else [],  # Get tracks
                         'score': (title_score + artist_score) / 2,
                         'artwork_url': artwork_url,
                         'deezer_id': track['id']
@@ -68,12 +69,10 @@ class DeezerProvider(MetadataProvider):
                 artist_score = string_similarity(artist, album_data['artist']['name']) if artist else 100
                 
                 if album_score > 60 and artist_score > 60:
-                    # Get full album info to get release date
+                    # Get full album info to get release date and tracks
                     album_info = self.session.get(f"{self.base_url}/album/{album_data['id']}").json()
-                    release_date = album_info.get('release_date', '').split('-')[0]  # Get year
-                    
-                    # Get album tracks
                     tracks = self._get_album_tracks(album_data['id'])
+                    release_date = album_info.get('release_date', '').split('-')[0]  # Get year
                     
                     # Get highest quality artwork
                     artwork_url = album_data.get('cover_xl') or album_data.get('cover_big')

@@ -1,88 +1,129 @@
 from typing import Dict, List
-from ytmusicapi import YTMusic
+import ytmusicapi
 from rich import print as rprint
-from ...core.metadata_manager import MetadataProvider
-from ...core.utils import string_similarity
+
+from .provider_base import MetadataProvider
+from ...core.utils import string_similarity  # Añadir import faltante
 
 class YouTubeMusicProvider(MetadataProvider):
-    """YouTube Music metadata provider using ytmusicapi."""
+    """YouTube Music metadata provider."""
     
     def __init__(self):
+        """Initialize YouTube Music client."""
         try:
-            self.ytmusic = YTMusic()  # No auth needed for search
-            rprint("[green]YouTube Music provider initialized[/green]")
+            self.client = ytmusicapi.YTMusic()
+            rprint("[cyan]YouTube Music provider initialized[/cyan]")
         except Exception as e:
-            rprint(f"[red]Error initializing YouTube Music: {str(e)}[/red]")
-            raise
+            rprint(f"[yellow]Error initializing YouTube Music: {str(e)}[/yellow]")
+            self.client = None
     
     @property
     def name(self) -> str:
         return "youtube"
     
     def search_track(self, title: str, artist: str = None) -> List[Dict]:
+        """Search for a track."""
+        if not self.client:
+            return []
+            
         try:
-            query = f"{artist} {title}" if artist else title
-            results = self.ytmusic.search(query, filter="songs", limit=5)
+            query = f"{artist} - {title}" if artist else title
+            results = self.client.search(query, filter="songs", limit=10)
             
             parsed = []
             for result in results:
                 if result['resultType'] == 'song':
-                    title_score = string_similarity(title, result['title'])
-                    artist_score = string_similarity(artist, result['artists'][0]['name']) if artist else 100
+                    # Get artist name
+                    artist_name = result['artists'][0]['name'] if result.get('artists') else ''
+                    title_score = string_similarity(title, result.get('title', ''))
+                    artist_score = string_similarity(artist, artist_name) if artist else 100
+                    
+                    # Ajuste fino del score para resultados de YouTube Music
+                    exact_match = (title.lower() == result.get('title', '').lower() and
+                                 (not artist or artist.lower() == artist_name.lower()))
+                    score_boost = 20 if exact_match else 0
                     
                     if title_score > 60 and artist_score > 60:
                         parsed.append(self.format_result({
-                            'title': result['title'],
-                            'artist': result['artists'][0]['name'],
-                            'album': result['album']['name'] if 'album' in result else '',
-                            'year': result.get('year', ''),
-                            'tracks': [],
-                            'score': (title_score + artist_score) / 2,
-                            'artwork_url': result.get('thumbnails', [{}])[-1].get('url')
+                            'title': result.get('title', ''),
+                            'artist': artist_name,
+                            'album': result.get('album', {}).get('name', ''),
+                            'year': result.get('album', {}).get('year', ''),  # Obtener año del álbum
+                            'duration': result.get('duration', ''),
+                            'score': min(100, ((title_score + artist_score) / 2) + score_boost),
+                            'provider': 'youtube',
+                            'tracks': result.get('album', {}).get('tracks', []),  # Añadir tracks
+                            'id': result.get('videoId')
                         }))
             
-            return sorted(parsed, key=lambda x: x.get('score', 0), reverse=True)
+            return sorted(parsed, key=lambda x: x.get('score', 0), reverse=True)[:5]  # Limitamos a 5 mejores resultados
             
         except Exception as e:
-            rprint(f"[red]YouTube Music track search error: {str(e)}[/red]")
+            rprint(f"[yellow]YouTube Music search error: {str(e)}[/yellow]")
             return []
     
     def search_album(self, album: str, artist: str = None) -> List[Dict]:
+        """Search for an album."""
+        if not self.client:
+            return []
+            
         try:
             query = f"{artist} {album}" if artist else album
-            results = self.ytmusic.search(query, filter="albums", limit=5)
+            results = self.client.search(query, filter="albums", limit=5)
             
             parsed = []
             for result in results:
                 if result['resultType'] == 'album':
-                    album_score = string_similarity(album, result['title'])
-                    artist_score = string_similarity(artist, result['artists'][0]['name']) if artist else 100
+                    # Get artist name
+                    artist_name = result['artists'][0]['name'] if result.get('artists') else ''
                     
-                    if album_score > 60 and artist_score > 60:
-                        # Get album details including tracks
-                        browse_id = result.get('browseId')
-                        if browse_id:
-                            album_data = self.ytmusic.get_album(browse_id)
-                            tracks = []
-                            
-                            for i, track in enumerate(album_data.get('tracks', []), 1):
-                                tracks.append({
-                                    'title': track['title'],
-                                    'position': str(i),
-                                    'duration': str(int(track.get('duration_seconds', 0)))
-                                })
-                            
-                            parsed.append(self.format_result({
-                                'title': result['title'],
-                                'artist': result['artists'][0]['name'],
-                                'year': result.get('year', ''),
-                                'tracks': tracks,
-                                'score': (album_score + artist_score) / 2,
-                                'artwork_url': result.get('thumbnails', [{}])[-1].get('url')
-                            }, "album"))
+                    # Get album tracks y año
+                    tracks = []
+                    year = ''
+                    try:
+                        album_id = result.get('browseId')
+                        if album_id:
+                            album_data = self.client.get_album(album_id)
+                            year = album_data.get('year', '')
+                            tracks = [{
+                                'title': track['title'],
+                                'position': str(i + 1),
+                                'duration': track.get('duration', ''),
+                                'id': track.get('videoId', '')
+                            } for i, track in enumerate(album_data.get('tracks', []))]
+                    except:
+                        pass
+                    
+                    parsed.append(self.format_result({
+                        'title': result.get('title', ''),
+                        'artist': artist_name,
+                        'year': year,
+                        'tracks': tracks,
+                        'score': self._calculate_score(album, result.get('title', ''),
+                                                     artist, artist_name),
+                        'provider': 'youtube',
+                        'id': result.get('browseId')
+                    }, "album"))
             
             return sorted(parsed, key=lambda x: x.get('score', 0), reverse=True)
             
         except Exception as e:
-            rprint(f"[red]YouTube Music album search error: {str(e)}[/red]")
+            rprint(f"[yellow]YouTube Music search error: {str(e)}[/yellow]")
             return []
+    
+    def _calculate_score(self, query_title: str, result_title: str,
+                        query_artist: str = None, result_artist: str = None) -> float:
+        """Calculate match score."""
+        from difflib import SequenceMatcher
+        
+        # Title similarity (60%)
+        title_score = (SequenceMatcher(None, query_title.lower(), 
+                                     result_title.lower()).ratio() * 60)
+        
+        # Artist similarity if provided (40%)
+        artist_score = 0
+        if query_artist and result_artist:
+            artist_score = (SequenceMatcher(None, query_artist.lower(),
+                                          result_artist.lower()).ratio() * 40)
+        
+        return title_score + artist_score

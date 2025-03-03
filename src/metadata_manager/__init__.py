@@ -1,3 +1,3 @@
-"""Music Metadata Manager - A flexible music metadata management system."""
+"""Metadata manager package."""
 
 __version__ = "0.1.0"

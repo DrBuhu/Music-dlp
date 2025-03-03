@@ -1,25 +1,36 @@
 """Metadata providers package."""
-
 from typing import List, Type
-from ..metadata_manager import MetadataProvider
+
+__all__ = [
+    'provider_base',
+    'musicbrainz_provider',
+    'spotify_provider',
+    'youtube_provider',
+    'itunes_provider',
+    'deezer_provider'
+]
+
+from .provider_base import MetadataProvider
+from .musicbrainz_provider import MusicBrainzProvider
+from .youtube_provider import YouTubeMusicProvider
+from .spotify_provider import SpotifyProvider
+from .itunes_provider import ITunesProvider
+from .deezer_provider import DeezerProvider
+
+# Export all providers
+__providers__ = [
+    MusicBrainzProvider,
+    YouTubeMusicProvider,
+    SpotifyProvider,
+    ITunesProvider,
+    DeezerProvider
+]
 
 def get_available_providers() -> List[Type[MetadataProvider]]:
     """Get list of available metadata providers."""
     providers = []
     
     # Always include MusicBrainz
-    from ..metadata_manager import MusicBrainzProvider
     providers.append(MusicBrainzProvider)
-    
-    # Try to load optional providers
-    try:
-        from .discogs_provider import DiscogsProvider
-        providers.append(DiscogsProvider)
-    except ImportError:
-        print("Warning: Discogs provider not available")
-    
-    # Add web provider as fallback
-    from ..web import WebMetadataProvider
-    providers.append(WebMetadataProvider)
     
     return providers
