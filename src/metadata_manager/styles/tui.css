@@ -16,178 +16,49 @@
     transition: background 500ms in_out_cubic, color 500ms in_out_cubic;
 }
 
-/* App Container */
-App {
-    background: #212121;
-    color: #f0f0f0;
-    layers: base overlay notifications;  /* Textual-specific layer system */
+/* Basic app styling */
+Screen {
+    background: #1f1f1f;
+    color: #ffffff;
 }
 
 /* Header/Footer with Textual-specific 'dock' property */
 Header {
-    background: #2c2c2c;
-    color: #20c997;
-    dock: top;        /* Textual dock property - ignore CSS validation */
+    dock: top;
     height: 1;
-    content-align: center middle;
+    background: #333333;
+    color: #00ff00;
 }
 
 Footer {
-    background: #2c2c2c;
-    color: #20c997;
-    dock: bottom;     /* Textual dock property - ignore CSS validation */
+    dock: bottom;
     height: 1;
+    background: #333333;
+    color: #00ff00;
 }
 
 /* Main Layout Containers */
 #sidebar {
-    width: 25%;
-    background: #1a1a1a;
-    padding: 1;
-    dock: left;       /* Textual dock property - ignore CSS validation */
-    border-right: solid #404040;
+    dock: left;
+    width: 20%;  /* Reducido de 25-30% a 20% */
+    background: #252525;
+    height: 100%;
 }
 
-#main_content {
-    background: #212121;
+#main {
+    dock: right;
+    width: 80%;  /* Aumentado para usar el espacio restante */
+    height: 100%;
+    background: #1f1f1f;
+}
+
+/* Directory tree styling */
+DirectoryTree {
     padding: 1;
-    overflow: auto;
 }
 
 /* Tables */
 DataTable {
-    width: 100%;
-    min-height: 10;
-    max-height: 16;
-    margin-bottom: 1;
-}
-
-/* Table Sections */
-#file_table {
-    height: 35%;
-    padding: 0 1;
-}
-
-#results_table {
-    height: 35%;
-    padding: 0 1;
-}
-
-/* Table Row Styling */
-DataTable > .datatable--rows {
-    background: #252525;
-}
-
-DataTable > .datatable--rows > .datatable--row-hover {
-    background: #303030;
-}
-
-DataTable > .datatable--rows > .datatable--row-selected {
-    background: #404050;
-}
-
-DataTable > .datatable--header {
-    background: #383838;
-    color: #20c997;
-}
-
-/* Directory Path Display */
-.path-display {
-    background: #2a2a2a;
-    color: #e0e0e0;
-    padding: 1 2;
-    border: solid #404040;
-    margin-bottom: 1;
-}
-
-/* Section Headers with Textual text-style */
-.section-header {
-    background: #383838;
-    color: #e0e0e0;
-    text-align: center;
-    margin-bottom: 1;
-    padding: 1;
-    text-style: bold;  /* Textual-specific text styling - ignore CSS validation */
-}
-
-/* Sidebar Headers */
-.sidebar-header {
-    color: #20c997;
-    text-align: center;
-    margin: 1 0;
-    text-style: bold;  /* Textual-specific text styling - ignore CSS validation */
-}
-
-/* Button Styling */
-Button {
-    margin: 0 0 1 0;
-    background: #2c2c2c;
-    color: #e0e0e0;
-    border: tall #505050;  /* Textual-specific border style */
-    width: 100%;
-}
-
-Button:hover {
-    background: #3c3c3c;
-    border: tall #606060;  /* Textual-specific border style */
-}
-
-Button.-primary {
-    background: #125840;
-    color: #ffffff;
-    border: tall #1a7c5a;  /* Textual-specific border style */
-}
-
-Button.-primary:hover {
-    background: #1a7c5a;
-    border: tall #20c997;  /* Textual-specific border style */
-}
-
-Button.-success {
-    background: #125840;
-    color: #ffffff;
-    border: tall #1a7c5a;  /* Textual-specific border style */
-}
-
-/* Directory Navigation */
-#directory_buttons {
-    layout: horizontal;  /* Textual-specific layout property - ignore CSS validation */
-    margin-bottom: 1;
-    height: auto;
-}
-
-#directory_buttons Button {
-    width: 1fr;      /* Textual-specific fractional unit */
-    margin-right: 1;
-}
-
-#directory_buttons Button:last-child {
-    margin-right: 0;
-}
-
-/* Recent Paths Buttons */
-.recent-button {
-    margin-bottom: 0;
-    width: 100%;
-    text-align: left;
-}
-
-/* Search Controls */
-#search_controls {
-    margin-top: 2;
-}
-
-/* Track Listing Area */
-.track-listing {
-    margin-top: 1;
-    height: auto;
-    overflow: auto;
-    padding: 1;
-    background: #252525;
-    border: solid #404040;
-}
-
-.track-details-header {
-    padding-top: 1;
-    color: #20c997;
+    height: 45%;  /* Ajustado para dar más espacio a las tablas */
+    margin: 1;
 }

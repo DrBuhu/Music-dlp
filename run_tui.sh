@@ -52,7 +52,7 @@ export PYTHONPATH="${PROJECT_DIR}:${PROJECT_DIR}/src:$PYTHONPATH"
 
 # Install required packages in venv
 echo -e "${YELLOW}Installing TUI dependencies...${NC}"
-pip install --quiet textual rich mutagen musicbrainzngs requests Pillow
+pip install --quiet textual rich mutagen musicbrainzngs requests Pillow ytmusicapi spotipy
 
 # Run the TUI
 echo -e "${GREEN}Starting TUI interface...${NC}"

@@ -84,12 +84,25 @@ class SpotifyProvider(MetadataProvider):
     def search_album(self, album: str, artist: str = None) -> List[Dict]:
         """Search for an album."""
         try:
-            query = f"{artist} {album}" if artist else album
+            self._get_token()  # Refresh token if needed
+            
+            query = f"{album}"
+            if artist:
+                query = f"album:{album} artist:{artist}"
+                
             response = self.session.get(
-                self.base_url,
-                params={'q': query, 'type': 'album'},
+                f"{self.base_url}/search",  # Corregido el endpoint
+                params={'q': query, 'type': 'album', 'limit': 5},
                 headers=self.headers
             )
+            
+            if response.status_code == 401:
+                self._get_token()  # Try refresh token
+                response = self.session.get(
+                    f"{self.base_url}/search",  # Corregido el endpoint
+                    params={'q': query, 'type': 'album', 'limit': 5},
+                    headers=self.headers
+                )
             
             data = response.json()
             albums = data.get('albums', {}).get('items', [])
@@ -100,16 +113,17 @@ class SpotifyProvider(MetadataProvider):
                 artist_score = string_similarity(artist, album_data.get('artists', [{}])[0].get('name', '')) if artist else 100
                 
                 if album_score > 60 and artist_score > 60:
-                    tracks = []
-                    try:
-                        album_tracks = album_data.get('tracks', {}).get('items', [])
-                        for i, track in enumerate(album_tracks, 1):
-                            tracks.append({
-                                'title': track['name'],
-                                'position': str(i)
-                            })
-                    except:
-                        pass
+                    # Get full album info to get tracks
+                    album_response = self.session.get(
+                        f"{self.base_url}/albums/{album_data['id']}",
+                        headers=self.headers
+                    )
+                    album_info = album_response.json()
+                    
+                    tracks = [{
+                        'title': t['name'],
+                        'position': str(i+1)
+                    } for i, t in enumerate(album_info['tracks']['items'])]
                     
                     parsed.append(self.format_result({
                         'title': album_data['name'],
