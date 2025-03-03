@@ -7,13 +7,13 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}=== Music-dlp TUI Runner ===${NC}"
+echo -e "${BLUE}=== Music-dlp Simple TUI Runner ===${NC}"
 
 # Get project root directory
 PROJECT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 
 # Create temporary venv
-TEMP_VENV="/tmp/music-dlp-tui-venv-$$"
+TEMP_VENV="/tmp/music-dlp-simple-tui-venv-$$"
 echo -e "${YELLOW}Creating temporary virtual environment at ${TEMP_VENV}...${NC}"
 
 python -m venv "$TEMP_VENV"
@@ -36,19 +36,9 @@ export PYTHONPATH="${PROJECT_DIR}:${PROJECT_DIR}/src:$PYTHONPATH"
 echo -e "${YELLOW}Installing TUI dependencies...${NC}"
 pip install --quiet rich mutagen musicbrainzngs requests spotipy ytmusicapi
 
-# TUI options
-echo "Select TUI version to run:"
-echo "1. Simple TUI (recommended) - Rich-based simple UI"
-echo "2. Curses TUI - Terminal-based panel UI"
-
-read -p "Enter choice [1]: " choice
-choice=${choice:-1}
-
-if [ "$choice" = "1" ]; then
-    exec ./run_simple_tui.sh
-else
-    exec ./run_curses_tui.sh
-fi
+# Run the TUI
+echo -e "${GREEN}Starting Simple TUI interface...${NC}"
+python -m src.metadata_manager.simple_tui
 
 # Cleanup
 deactivate
