@@ -11,6 +11,7 @@ from rich.prompt import Confirm
 # Importaciones relativas simples
 from .core.file_scanner import FileScanner
 from .core.metadata_manager import MetadataManager
+from .core.display import display_results_table  # Nuevo import
 
 def parse_args():
     """Parse command line arguments."""
@@ -57,33 +58,19 @@ def display_metadata(files: List[Dict], compact: bool = True):
         if artist or album:
             rprint(f"\nTracks: {len(files)} • Artist: {artist} • Album: {album} • Year: {date}")
 
-def display_results_table(results: List[Dict]):
-    """Display search results in a table."""
-    if not results:
-        return
-        
-    table = Table(title="\nSearch Results")
-    table.add_column("Source")
-    table.add_column("Title")
-    table.add_column("Artist")
-    table.add_column("Album")
-    table.add_column("Year")
-    table.add_column("Score")
-    table.add_column("Tracks")  # Nueva columna
+def _format_display_title(self, match: Dict) -> str:
+    """Format title with year and tracks info."""
+    title = match.get('title') or match.get('album') or '(No title)'
+    year = match.get('year', '')
+    num_tracks = len(match.get('tracks', []))
     
-    for result in results:
-        source = result.get("provider", "unknown")
-        title = result.get("title", "Unknown")
-        artist = result.get("artist", "Unknown")
-        album = result.get("album", title)
-        year = result.get("year", "")
-        score = f"{result.get('score', 0):.1f}"
-        num_tracks = len(result.get('tracks', []))
-        tracks_str = str(num_tracks) if num_tracks > 0 else ""
-        
-        table.add_row(source, title, artist, album, year, score, tracks_str)
-        
-    rprint(table)
+    # Build display string
+    parts = []
+    parts.append(f"{match.get('artist', '')} - {title}")
+    if year:
+        parts.append(f"({year})")
+    
+    return " ".join(parts)
 
 def search_metadata(files: List[Dict], args) -> None:
     """Search for metadata and display results."""

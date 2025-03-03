@@ -11,6 +11,8 @@ from .providers.spotify_provider import SpotifyProvider
 from .providers.itunes_provider import ITunesProvider
 from .providers.deezer_provider import DeezerProvider
 
+from .display import display_results_table  # Nuevo import desde el mismo directorio
+
 class MetadataManager:
     def __init__(self, enabled_providers: Optional[List[str]] = None):
         """Initialize with all providers."""
@@ -108,30 +110,17 @@ class MetadataManager:
             rprint("[yellow]No matches found in any source[/yellow]")
             return None
 
-        while True:  # Main selection loop
-            # Show all results from all sources
-            rprint("\n[bold cyan]Search Results:[/bold cyan]")
-            all_matches = []
-            match_index = 1
+        # Show table first
+        all_results = [item for sublist in results.values() for item in sublist]
+        display_results_table(all_results)
 
-            for source, matches in results.items():
-                if matches:
-                    rprint(f"\n[bold]{source.upper()}[/bold] ({len(matches)} matches):")
-                    
-                    for match in matches:
-                        all_matches.append((source, match))
-                        tracks_info = f"{len(match['tracks'])} tracks" if 'tracks' in match and match['tracks'] else "no track info"
-                        display_title = self._format_display_title(match)
-                        rprint(f"  [green]{match_index}.[/green] {display_title} • {tracks_info}")
-                        match_index += 1
+        # Show options menu
+        rprint("\nOptions:")
+        rprint(f"  [green]1-{len(all_results)}[/green] Select a match")
+        rprint("  [yellow]s[/yellow] Manual search")
+        rprint("  [red]0[/red] Skip/Exit")
 
-            # Show options
-            rprint("\n[bold cyan]Options:[/bold cyan]")
-            rprint("  [green]1-{:d}[/green] Select a match".format(len(all_matches)))
-            rprint("  [yellow]s[/yellow] Manual search")
-            rprint("  [red]0[/red] Skip/Exit")
-
-            # Get user choice
+        while True:
             choice = Prompt.ask("\nEnter your choice", default="0")
             
             if choice.lower() == 's':
@@ -142,25 +131,22 @@ class MetadataManager:
                 choice_num = int(choice)
                 if choice_num == 0:
                     return None
-                elif 1 <= choice_num <= len(all_matches):
-                    source, match = all_matches[choice_num - 1]
+                elif 1 <= choice_num <= len(all_results):
+                    match = all_results[choice_num - 1]
                     
                     # Show detailed info
                     rprint("\n[bold]Selected match details:[/bold]")
-                    rprint(f"Source: [cyan]{source}[/cyan]")
-                    rprint(f"Artist: [yellow]{match['artist']}[/yellow]")
-                    rprint(f"Album: [blue]{match['title'] or match['album']}[/blue]")
-                    if match['year']:
+                    rprint(f"Source: [cyan]{match.get('provider', 'unknown')}[/cyan]")
+                    rprint(f"Artist: [yellow]{match.get('artist', '')}[/yellow]")
+                    rprint(f"Title: [green]{match.get('title', '')}[/green]")
+                    if match.get('year'):
                         rprint(f"Year: [magenta]{match['year']}[/magenta]")
-                    
-                    if 'tracks' in match and match['tracks']:
-                        rprint("\n[bold]Track listing:[/bold]")
-                        for track in match['tracks']:
-                            rprint(f"  {track['position']}. {track['title']}")
+                    if match.get('tracks'):
+                        rprint(f"Tracks: [blue]{len(match['tracks'])}[/blue]")
                     
                     if Confirm.ask("\nUse this match?", default=True):
                         return match
-                    # No else needed - loop will continue automatically
+                    
             except ValueError:
                 rprint("[yellow]Invalid choice, try again[/yellow]")
 
