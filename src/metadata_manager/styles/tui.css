@@ -43,13 +43,21 @@ Footer {
     width: 20%;  /* Reducido de 25-30% a 20% */
     background: #252525;
     height: 100%;
+    border: solid green;
 }
 
 #main {
     dock: right;
     width: 80%;  /* Aumentado para usar el espacio restante */
     height: 100%;
-    background: #1f1f1f;
+}
+
+/* New details container */
+#details_container {
+    height: 30%;
+    background: #222222;
+    border: solid #333333;
+    padding: 1;
 }
 
 /* Directory tree styling */
@@ -59,6 +67,22 @@ DirectoryTree {
 
 /* Tables */
 DataTable {
-    height: 45%;  /* Ajustado para dar más espacio a las tablas */
-    margin: 1;
+    height: auto;
+    margin: 0 1;
+}
+
+.section-header {
+    padding: 1 2;
+    background: #333333;
+    color: #00ff00;
+    text-align: center;
+    margin: 1 0;
+}
+
+/* Metadata details */
+.metadata-details {
+    padding: 1;
+    height: auto;
+    background: #222222;
+    color: #ffffff;
 }

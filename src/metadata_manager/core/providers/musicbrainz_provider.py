@@ -41,7 +41,7 @@ class MusicBrainzProvider(MetadataProvider):
             result = self._retry_request(
                 mb.search_recordings,
                 query=query,
-                limit=5
+                limit=5  # Aumentado de 1 a 5
             )
             
             if not result or 'recording-list' not in result:
