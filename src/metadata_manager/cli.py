@@ -98,19 +98,14 @@ def search_metadata(files: List[Dict], args) -> None:
         
         if results:
             rprint(f"\n[cyan]Results for: {title}[/cyan]")
-            display_results_table([item for sublist in results.values() for item in sublist])
+            options = manager.select_metadata(results, [file])  # Ya no mostramos resultados aquí
             
-            match = manager.select_metadata(results, [file])
-            if match:
-                rprint(f"Selected: {match['title']} by {match['artist']}")
+            if options:
+                rprint(f"Selected: {options['title']} by {options['artist']}")
                 processed += 1
-            elif not args.auto:  # Solo salimos si no estamos en modo auto
-                # Usuario eligió salir (0)
+            elif not args.auto:
                 if Confirm.ask("\nExit metadata search?", default=True):
                     break
-                
-    if processed > 0:
-        rprint(f"\n[green]Processed {processed} of {len(files)} files[/green]")
 
 def main():
     """Main entry point."""

@@ -110,8 +110,31 @@ class MetadataManager:
             rprint("[yellow]No matches found in any source[/yellow]")
             return None
 
-        # Show table first
-        all_results = [item for sublist in results.values() for item in sublist]
+        # Consolidate all results and share metadata between providers
+        all_results = []
+        for provider_results in results.values():
+            for result in provider_results:
+                # Try to get year from other results if missing
+                if not result.get('year'):
+                    for other in all_results:
+                        if (other['title'].lower() == result['title'].lower() and
+                            other['artist'].lower() == result['artist'].lower() and
+                            other.get('year')):
+                            result['year'] = other['year']
+                            break
+
+                # Try to get tracks from other results if missing
+                if not result.get('tracks'):
+                    for other in all_results:
+                        if (other['title'].lower() == result['title'].lower() and
+                            other['artist'].lower() == result['artist'].lower() and
+                            other.get('tracks')):
+                            result['tracks'] = other['tracks']
+                            break
+                
+                all_results.append(result)
+
+        # Display results only once
         display_results_table(all_results)
 
         # Show options menu

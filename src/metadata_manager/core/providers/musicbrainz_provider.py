@@ -81,16 +81,29 @@ class MusicBrainzProvider(MetadataProvider):
         for track in tracks:
             try:
                 artist = track['artist-credit'][0]['name'] if 'artist-credit' in track else ''
-                album = track['release-list'][0].get('title', '') if track.get('release-list') else ''
-                date = track['release-list'][0].get('date', '')[:4] if track.get('release-list') and 'date' in track['release-list'][0] else ''
-                score = float(track.get('ext:score', 0))
+                
+                # Get release info and tracks
+                album = None
+                year = ''
+                track_list = []
+                if track.get('release-list'):
+                    album = track['release-list'][0]
+                    # Try to get year and tracks
+                    for release in track['release-list']:
+                        if 'date' in release:
+                            year = release['date'][:4]
+                        if not track_list:  # Get tracks from first release that has them
+                            track_list = self._get_album_tracks(release.get('id', ''))
+                        if year and track_list:  # If we have both, stop looking
+                            break
                 
                 result = {
                     'title': track.get('title', ''),
                     'artist': artist,
-                    'album': album,
-                    'year': date,
-                    'score': score,
+                    'album': album.get('title', '') if album else '',
+                    'year': year,
+                    'tracks': track_list,  # Add tracks here
+                    'score': float(track.get('ext:score', 0)),
                     'id': track.get('id', ''),
                     'provider': 'musicbrainz'
                 }

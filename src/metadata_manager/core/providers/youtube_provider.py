@@ -33,30 +33,38 @@ class YouTubeMusicProvider(MetadataProvider):
             parsed = []
             for result in results:
                 if result['resultType'] == 'song':
-                    # Get artist name
+                    # Get artist name and score
                     artist_name = result['artists'][0]['name'] if result.get('artists') else ''
                     title_score = string_similarity(title, result.get('title', ''))
                     artist_score = string_similarity(artist, artist_name) if artist else 100
                     
-                    # Ajuste fino del score para resultados de YouTube Music
-                    exact_match = (title.lower() == result.get('title', '').lower() and
-                                 (not artist or artist.lower() == artist_name.lower()))
-                    score_boost = 20 if exact_match else 0
+                    # Get album info with tracks
+                    year = ''
+                    tracks = []
+                    if result.get('album', {}).get('id'):
+                        try:
+                            album_data = self.client.get_album(result['album']['id'])
+                            year = album_data.get('year', '')
+                            tracks = [{
+                                'title': t['title'],
+                                'position': str(i + 1)
+                            } for i, t in enumerate(album_data.get('tracks', []))]
+                        except:
+                            pass
                     
                     if title_score > 60 and artist_score > 60:
                         parsed.append(self.format_result({
                             'title': result.get('title', ''),
                             'artist': artist_name,
                             'album': result.get('album', {}).get('name', ''),
-                            'year': result.get('album', {}).get('year', ''),  # Obtener año del álbum
-                            'duration': result.get('duration', ''),
-                            'score': min(100, ((title_score + artist_score) / 2) + score_boost),
+                            'year': year,
+                            'tracks': tracks,  # Include tracks here
+                            'score': min(100, ((title_score + artist_score) / 2)),
                             'provider': 'youtube',
-                            'tracks': result.get('album', {}).get('tracks', []),  # Añadir tracks
                             'id': result.get('videoId')
                         }))
             
-            return sorted(parsed, key=lambda x: x.get('score', 0), reverse=True)[:5]  # Limitamos a 5 mejores resultados
+            return sorted(parsed, key=lambda x: x.get('score', 0), reverse=True)[:5]
             
         except Exception as e:
             rprint(f"[yellow]YouTube Music search error: {str(e)}[/yellow]")

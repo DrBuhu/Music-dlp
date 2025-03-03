@@ -34,7 +34,7 @@ export PYTHONPATH="$(pwd):$(pwd)/src:$PYTHONPATH"
 
 # Install required packages in venv
 echo -e "${YELLOW}Installing dependencies...${NC}"
-pip install --quiet rich mutagen spotipy ytmusicapi musicbrainzngs requests Pillow
+pip install --quiet rich mutagen spotipy ytmusicapi musicbrainzngs requests Pillow beautifulsoup4
 
 if [ $# -eq 0 ]; then
     echo -e "${YELLOW}Usage: $0 <music_directory> [-r] [-d]${NC}"
